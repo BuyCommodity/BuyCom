@@ -404,7 +404,7 @@ export default function AdminDashboard() {
                                                             id="annual_turnover"
                                                             className="col-span-3"
                                                             type="number"
-                                                            defaultValue={item.annual_turnover?.number()}
+                                                            defaultValue={item.annual_turnover?.toString()}
                                                             // defaultValue={item.annual_turnover ? parseFloat(item.annual_turnover) : ""}
                                                             onChange={(e) => handleAnnualTurnoverChange(e.target.value)}
                                                         />
