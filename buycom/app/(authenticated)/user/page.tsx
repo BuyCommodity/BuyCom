@@ -41,7 +41,7 @@ export default function UserDashboard() {
     const [currentPage, setCurrentPage] = useState(1)
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
-    const [itemsPerPage] = useState(10)
+    const [itemsPerPage] = useState(5)
     const router = useRouter()
     const [filters, setFilters] = useState({
         legal_name: '',
