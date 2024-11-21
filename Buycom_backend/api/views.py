@@ -94,20 +94,33 @@ def fetch_and_save_gst_record(request):
 
     # Determine financial years for URL 2 and URL 3
     current_date = datetime.today()
+
+    # Get the current month and year
     current_month = current_date.month
-    current_year = current_date.year
-    start_month = current_month - 11
-    if start_month <= 0:
+    current_year_old = current_date.year
+    current_year = current_year_old + 1
+    # Calculate the start month and year for the last 12 months
+    start_month = current_month - 11  # 12 months back, including the current month
+    if start_month <= 0:  # If the start month is before January, adjust the year
         start_month += 12
         start_year = current_year - 1
     else:
         start_year = current_year
-    
-    fy2 = f"{start_year}-{str(current_year)[2:]}"
+        
+    # Get the last two digits of the year
+    start_year_short = str(start_year)[2:]
+    current_year_short = str(current_year)[2:]
+
+    # Set the financial year (fy) to reflect the range from the start month to the current month of the current year
+    fy = f"{start_year}-{current_year_short}"
+
+    # Debug output to check the values
+    print("Financial Year : ", fy)
     fy3 = f"{start_year - 1}-{str(start_year)[2:]}"
+    print("Financial Year : ", fy3)
 
     # Fetch return data for URL 2
-    url2 = f"{RETURNS_URL}?aspid={ASP_ID}&password={PASSWORD}&Action=RETTRACK&Gstin={gstin}&fy={fy2}"
+    url2 = f"{RETURNS_URL}?aspid={ASP_ID}&password={PASSWORD}&Action=RETTRACK&Gstin={gstin}&fy={fy}"
     response2 = requests.get(url2)
     logger.info("Response from second API (status code: %s): %s", response2.status_code, response2.text)
 
@@ -300,7 +313,7 @@ def update_gst_record(request):
             ) else "Fail"
 
             # Set the result for the record
-            record.result = result
+            record.status = result
             record.save()
 
         except Exception as e:
