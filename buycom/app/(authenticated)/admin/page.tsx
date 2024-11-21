@@ -385,7 +385,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={filters.legal_name}
                             onChange={(e) => handleFilterChange('legal_name', e.target.value)}
-                            placeholder="Legal Name"
+                            placeholder="Search by Company Name"
                         />
                         <Input
                             type="text"
