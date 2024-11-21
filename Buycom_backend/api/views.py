@@ -95,7 +95,22 @@ def fetch_and_save_gst_record(request):
         logger.error("Failed to fetch data from first API.")
         return Response({"error": "Failed to fetch data from first API."}, status=500)
 
-    fy = "2023-24"
+        current_date = datetime.today()
+
+    # Get the current month and year
+    current_month = current_date.month
+    current_year = current_date.year
+
+    # Calculate the start month and year for the last 12 months
+    start_month = current_month - 11  # 12 months back, including the current month
+    if start_month <= 0:  # If the start month is before January, adjust the year
+        start_month += 12
+        start_year = current_year - 1
+    else:
+        start_year = current_year
+        
+    fy = f"{start_year}-{current_year}"
+    print(f"Financial Year: {fy}")
     url2 = f"{RETURNS_URL}?aspid={ASP_ID}&password={PASSWORD}&Action=RETTRACK&Gstin={gstin}&fy={fy}"
     response2 = requests.get(url2)
     
