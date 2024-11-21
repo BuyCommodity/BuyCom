@@ -13,7 +13,27 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
 
+
+import { UserOptions as AutoTableUserOptions } from 'jspdf-autotable'
+
+interface AutoTableOptions extends Omit<AutoTableUserOptions, 'theme'> {
+    startY: number;
+    head: string[][];
+    body: string[][];
+    theme?: 'striped' | 'grid' | 'plain' | 'css';
+}
+
+declare module 'jspdf' {
+    interface jsPDF {
+        autoTable: (options: AutoTableOptions) => jsPDF;
+        lastAutoTable?: {
+            finalY: number;
+        };
+    }
+}
 interface Company {
     id: number;
     gstin: string;
