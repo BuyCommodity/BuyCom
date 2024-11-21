@@ -72,80 +72,82 @@ def fetch_and_save_gst_record(request):
         logger.error("GSTIN is required but not provided.")
         return Response({"error": "GSTIN is required."}, status=400)
 
-    # Fetch the current date for 'fetch_date'
     fetch_date = datetime.today().strftime('%d-%m-%Y')
-
-    # Get 'annual_turnover' from user input, or set it to empty if not provided
     annual_turnover = request.data.get('annual_turnover', '0')
     delayed_filling = request.data.get('delayed_filling', '')
     Delay_days = request.data.get('Delay_days', '')
     result = request.data.get('result', 'N/A')
     
+    # Fetch primary GST data (API 1)
     url1 = f"{BASE_URL}?aspid={ASP_ID}&password={PASSWORD}&Action=TP&Gstin={gstin}"
     response1 = requests.get(url1)
-    
     logger.info("Response from first API (status code: %s): %s", response1.status_code, response1.text)
 
-    if response1.status_code == 200:
-        gst_data = response1.json()
-        if not gst_data:
-            logger.error("No data found in first API response.")
-            return Response({"error": "No data found in first API response."}, status=500)
-    else:
+    if response1.status_code != 200:
         logger.error("Failed to fetch data from first API.")
         return Response({"error": "Failed to fetch data from first API."}, status=500)
-
-    #     current_date = datetime.today()
-
-    # # Get the current month and year
-    # current_month = current_date.month
-    # current_year = current_date.year
-
-    # # Calculate the start month and year for the last 12 months
-    # start_month = current_month - 11  # 12 months back, including the current month
-    # if start_month <= 0:  # If the start month is before January, adjust the year
-    #     start_month += 12
-    #     start_year = current_year - 1
-    # else:
-    #     start_year = current_year
-        
-    # fy = f"{start_year}-{current_year}"
-    # print(f"Financial Year: {fy}")
-
-
-    fy = "2023-24"
-    url2 = f"{RETURNS_URL}?aspid={ASP_ID}&password={PASSWORD}&Action=RETTRACK&Gstin={gstin}&fy={fy}"
-    response2 = requests.get(url2)
     
+    gst_data = response1.json()
+    if not gst_data:
+        logger.error("No data found in first API response.")
+        return Response({"error": "No data found in first API response."}, status=500)
+
+    # Determine financial years for URL 2 and URL 3
+    current_date = datetime.today()
+    current_month = current_date.month
+    current_year = current_date.year
+    start_month = current_month - 11
+    if start_month <= 0:
+        start_month += 12
+        start_year = current_year - 1
+    else:
+        start_year = current_year
+    
+    fy2 = f"{start_year}-{str(current_year)[2:]}"
+    fy3 = f"{start_year - 1}-{str(start_year)[2:]}"
+
+    # Fetch return data for URL 2
+    url2 = f"{RETURNS_URL}?aspid={ASP_ID}&password={PASSWORD}&Action=RETTRACK&Gstin={gstin}&fy={fy2}"
+    response2 = requests.get(url2)
     logger.info("Response from second API (status code: %s): %s", response2.status_code, response2.text)
 
-    if response2.status_code == 200:
-        data2 = response2.json()
-        if "EFiledlist" not in data2:
-            logger.error("No 'EFiledlist' field in second API response.")
-            return Response({"error": "Invalid response structure from second API."}, status=500)
-    else:
+    if response2.status_code != 200:
         logger.error("Failed to fetch data from second API.")
         return Response({"error": "Failed to fetch data from second API."}, status=500)
+    
+    data2 = response2.json()
+    if "EFiledlist" not in data2:
+        logger.error("No 'EFiledlist' field in second API response.")
+        return Response({"error": "Invalid response structure from second API."}, status=500)
 
+    # Fetch return data for URL 3
+    url3 = f"{RETURNS_URL}?aspid={ASP_ID}&password={PASSWORD}&Action=RETTRACK&Gstin={gstin}&fy={fy3}"
+    response3 = requests.get(url3)
+    logger.info("Response from third API (status code: %s): %s", response3.status_code, response3.text)
+
+    if response3.status_code != 200:
+        logger.error("Failed to fetch data from third API.")
+        return Response({"error": "Failed to fetch data from third API."}, status=500)
+    
+    data3 = response3.json()
+    if "EFiledlist" not in data3:
+        logger.error("No 'EFiledlist' field in third API response.")
+        return Response({"error": "Invalid response structure from third API."}, status=500)
+
+    # Process and save data from data2 and data3
+    all_return_data = data2.get("EFiledlist", []) + data3.get("EFiledlist", [])
     principal_address = gst_data.get("pradr", {})
     registration_date = gst_data.get("rgdt")
     last_update = gst_data.get("lstupdt")
 
-    return_data = data2.get("EFiledlist", [])
-    if not return_data:
-        logger.error("No valid return data found in second API response.")
-        return Response({"error": "No valid return data found in second API response."}, status=500)
-    
-    for record in return_data:
+    for record in all_return_data:
         return_type = record.get("rtntype")
         date_of_filing = record.get("dof")
         period = record.get("ret_prd", "")
         return_status = request.data.get("status", "Active")
         year = period[2:] if period else ""
         month = period[:2] if period else ""
-        
-        # Convert dates to strings in the desired format
+
         try:
             registration_date_str = datetime.strptime(registration_date, '%d/%m/%Y').strftime('%d-%m-%Y') if registration_date else None
             last_update_str = datetime.strptime(last_update, '%d/%m/%Y').strftime('%d-%m-%Y') if last_update else None
@@ -154,10 +156,9 @@ def fetch_and_save_gst_record(request):
             logger.error(f"Date format error: {e}")
             return Response({"error": "Date format error."}, status=500)
 
-        # Update the state field to use 'loc' from pradr->addr
         state = gst_data.get("pradr", {}).get("addr", {}).get("loc", "N/A")
         city = gst_data.get("pradr", {}).get("addr", {}).get("city", "N/A")
-        
+
         company_gst_record = CompanyGSTRecord.objects.create(
             gstin=gstin,
             legal_name=gst_data.get("lgnm"),
@@ -166,22 +167,21 @@ def fetch_and_save_gst_record(request):
             principal_address=principal_address,
             registration_date=registration_date_str,
             last_update=last_update_str,
-            state=state,  # This now uses the 'loc' field
+            state=state,
+            city=city,
             date_of_filing=date_of_filing_str,
             return_type=return_type,
             return_period=period,
             return_status=return_status,
             year=year,
             month=month,
-            city=city,
-            fetch_date=fetch_date,  # Use the current date for fetch_date
-            annual_turnover=annual_turnover,  # Use the provided or empty annual turnover
+            fetch_date=fetch_date,
+            annual_turnover=annual_turnover,
             delayed_filling=delayed_filling,
             Delay_days=Delay_days,
             result=result,
             additional_data=gst_data
         )
-
         logger.info(f"Record saved: {company_gst_record}")
 
     return Response({"message": "Data fetched and saved successfully."})
