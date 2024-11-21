@@ -385,7 +385,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={filters.legal_name}
                             onChange={(e) => handleFilterChange('legal_name', e.target.value)}
-                            placeholder="Search by Company Name"
+                            placeholder="Search by Legal Name"
                         />
                         <Input
                             type="text"
@@ -420,7 +420,7 @@ export default function AdminDashboard() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Company Name</TableHead>
+                            <TableHead>Legal Name</TableHead>
                             <TableHead>GSTIN</TableHead>
                             <TableHead>State</TableHead>
                             <TableHead>Fetch Date</TableHead>
