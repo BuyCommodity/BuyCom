@@ -206,7 +206,7 @@ def update_gst_record(request):
     gstin = request.data.get('gstin')
     annual_turnover = request.data.get('annual_turnover')
     status = request.data.get('status')
-
+    
     if not gstin:
         logger.error("GSTIN is required but not provided.")
         return Response({"error": "GSTIN is required."}, status=400)
@@ -216,12 +216,16 @@ def update_gst_record(request):
         gstin=gstin,
         return_type__in=["GSTR3B", "GSTR1"]
     )
+    
 
+    
     if not records.exists():
         logger.info(f"No records found for GSTIN {gstin} with required return types.")
         return Response({"message": "No applicable records found."}, status=404)
 
-    # Handle the annual_turnover to ensure it's valid
+    # if annual_turnover == annual_turnover:
+        
+    # Validate and handle annual_turnover
     if annual_turnover == "" or annual_turnover is None:
         annual_turnover = None  # Set to None for the database
     else:
@@ -231,97 +235,108 @@ def update_gst_record(request):
             logger.error(f"Invalid annual_turnover value: {annual_turnover}")
             return Response({"error": "Invalid annual_turnover value."}, status=400)
 
-    # Step 1: Update annual_turnover and status in all records
-    for record in records:
-        record.annual_turnover = annual_turnover
-        if status:
-            record.result = status  # Temporary save the status if provided
-        record.save()
-
-    # Step 2: Fetch the updated data and apply the business rules
-    updated_records = CompanyGSTRecord.objects.filter(
-        gstin=gstin,
-        return_type__in=["GSTR3B", "GSTR1"]
-    )
-
+    # Function to determine due date
     def determine_due_date(state, annual_turnover):
         if annual_turnover is None:
             return 20  # Default due date
         if annual_turnover > 5_00_00_000:  # 5 Crore
             return 20
-        elif state in ["Chhattisgarh", "Madhya Pradesh", "Gujarat", "Daman and Diu", 
-                       "Dadra and Nagar Haveli", "Maharashtra", "Karnataka", "Goa", 
-                       "Lakshadweep", "Kerala", "Tamil Nadu", "Puducherry", 
-                       "Andaman and Nicobar Islands", "Telangana", "Andhra Pradesh"]:
+        elif state in [
+            "Chhattisgarh", "Madhya Pradesh", "Gujarat", "Daman and Diu",
+            "Dadra and Nagar Haveli", "Maharashtra", "Karnataka", "Goa",
+            "Lakshadweep", "Kerala", "Tamil Nadu", "Puducherry",
+            "Andaman and Nicobar Islands", "Telangana", "Andhra Pradesh"
+        ]:
             return 22
         else:
             return 24
 
-    for record in updated_records:
-        try:
-            state = record.state
-            filing_date = datetime.strptime(record.date_of_filing, "%d-%m-%Y")
+    for record in records:
+        print(record.annual_turnover == annual_turnover)
+        print(type(record.annual_turnover))
+        print(type(annual_turnover))    
+        
+        if int(record.annual_turnover) == annual_turnover: 
+            print(type(record.annual_turnover))
+            
+            print("if condition is running")
+            
+            record.result = status 
+            record.save() 
+            annual_turnover = int(annual_turnover)
+        elif record.annual_turnover != annual_turnover:  # Corrected inequality check
+            # Debug print statement to check values and types
+            print("elif condition is running")
+            
+            # Update annual_turnover and recalculate result if annual_turnover is provided
+            if annual_turnover is not None:
+                print("Updating record.annual_turnover")
+                record.annual_turnover = annual_turnover
 
-            # Set due date based on state and turnover
-            due_day = determine_due_date(state, annual_turnover)
-            due_date = filing_date.replace(day=due_day)
+                # Debugging: print the updated value of annual_turnover
+                print(f"Updated record.annual_turnover: {record.annual_turnover}")
 
-            # Calculate Delayed filling and Delay days
-            delayed_filling = "Yes" if filing_date > due_date else "No"
-            delay_days = (filing_date - due_date).days if delayed_filling == "Yes" else 0
+                # Recalculate status (result) based on annual_turnover
+                state = record.state
+                filing_date = datetime.strptime(record.date_of_filing, "%d-%m-%Y")
 
-            # Ensure Delay_days is treated as an integer
-            try:
-                delay_days_int = int(record.Delay_days) if record.Delay_days.isdigit() else 0
-            except ValueError:
-                delay_days_int = 0
+                # Determine due date based on state and annual_turnover
+                due_day = determine_due_date(state, annual_turnover)
+                due_date = filing_date.replace(day=due_day)
 
-            # Update Delay_days with the new value (as an integer in string form)
-            record.delayed_filling = delayed_filling
-            record.Delay_days = str(delay_days_int)
+                # Calculate delayed filling and delay days
+                delayed_filling = "Yes" if filing_date > due_date else "No"
+                delay_days = (filing_date - due_date).days if delayed_filling == "Yes" else 0
 
-            # Evaluate result based on delay conditions
-            past_year_records = updated_records.filter(
-                date_of_filing__gte=datetime.now() - timedelta(days=365)
-            )
+                # Update delayed_filling and delay_days
+                record.delayed_filling = delayed_filling
+                record.Delay_days = str(delay_days)
 
-            # Handle delay calculation using the cleaned Delay_days field
-            avg_delay = past_year_records.aggregate(
-                avg_delay=Avg(
-                    Case(
-                        When(Delay_days__regex=r"^\d+$", then=Cast("Delay_days", IntegerField())),
-                        default=Value(0),
-                        output_field=IntegerField(),
+                # Recalculate result based on delay conditions
+                past_year_records = CompanyGSTRecord.objects.filter(
+                    gstin=gstin,
+                    return_type__in=["GSTR3B", "GSTR1"],
+                    date_of_filing__gte=datetime.now() - timedelta(days=365)
+                )
+
+                avg_delay = past_year_records.aggregate(
+                    avg_delay=Avg(
+                        Case(
+                            When(Delay_days__regex=r"^\d+$", then=Cast("Delay_days", IntegerField())),
+                            default=Value(0),
+                            output_field=IntegerField(),
+                        )
                     )
-                )
-            )["avg_delay"] or 0
+                )["avg_delay"] or 0
 
-            long_delays = past_year_records.filter(
-                Delay_days__gt="15"  # String comparison for long delays
-            ).count()
+                long_delays = past_year_records.filter(Delay_days__gt="15").count()
 
-            # Determine the last month (immediate past month)
-            immediate_past_month = (datetime.now().replace(day=1) - timedelta(days=1)).month
+                immediate_past_month = (datetime.now().replace(day=1) - timedelta(days=1)).month
 
-            # Pass or Fail determination
-            result = "Pass" if (
-                avg_delay <= 7 and long_delays <= 1 and
-                all(
-                    datetime.strptime(past_record.date_of_filing, "%d-%m-%Y").month != immediate_past_month
-                    for past_record in past_year_records
-                )
-            ) else "Fail"
+                result = "Pass" if (
+                    avg_delay <= 7 and long_delays <= 1 and
+                    all(
+                        datetime.strptime(past_record.date_of_filing, "%d-%m-%Y").month != immediate_past_month
+                        for past_record in past_year_records
+                    )
+                ) else "Fail"
 
-            # Set the result for the record
-            record.result = result
+                record.result = result  # Update the result after recalculation
+
+                # Save the record after updates
             record.save()
 
-        except Exception as e:
-            logger.error(f"Error processing record {record.id}: {e}")
-            return Response({"error": f"Error processing record {record.id}: {e}"}, status=500)
+            print("Record saved after update.")
+            
+        # Ensure record is saved in case it's updated in any block
+        record.save()
+
+    # After loop finishes
+    print("Processing completed.")
+
+
 
     return Response({"message": "GST records updated successfully."})
-
 
 
 
