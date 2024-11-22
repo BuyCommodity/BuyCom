@@ -228,7 +228,10 @@ export default function UserDashboard() {
     
             return 0;
         });
-    
+
+        if (filingDetails.length > 24) {
+            filingDetails.splice(24);
+        }
         // Convert month number to month name after sorting
         const sortedFilingDetails = filingDetails.map(item => [
             item[0], // Year
