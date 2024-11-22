@@ -313,7 +313,7 @@ def update_gst_record(request):
             ) else "Fail"
 
             # Set the result for the record
-            record.status = result
+            record.result = result
             record.save()
 
         except Exception as e:
