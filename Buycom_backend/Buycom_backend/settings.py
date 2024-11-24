@@ -28,10 +28,11 @@ SECRET_KEY = 'django-insecure--7uuuqwn6i-qfq7xya^sqy6r!h^cox@$^f+g(jx(9*(@ik&7tm
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', "buycommodity.vercel.app"]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Replace with your Next.js frontend URL
+    "http://localhost:3000",
+    "https://buycommodity.vercel.app", # Replace with your Next.js frontend URL
 ]
 CORS_ALLOW_HEADERS = [
     'content-type',
