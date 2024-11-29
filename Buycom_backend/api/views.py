@@ -274,11 +274,11 @@ def update_annual_turnover_and_status(request):
 
             immediate_past_month = (datetime.now().replace(day=1) - timedelta(days=1)).month
             result = "Pass" if (
-                avg_delay <= 7 and long_delays <= 3 and
-                all(
-                    datetime.strptime(past_record.date_of_filing, "%d-%m-%Y").month != immediate_past_month
-                    for past_record in past_year_records
-                )
+                avg_delay <= 7 and long_delays <= 3
+                # all(
+                #     datetime.strptime(past_record.date_of_filing, "%d-%m-%Y").month != immediate_past_month
+                #     for past_record in past_year_records
+                # )
             ) else "Fail"
 
             record.result = result
