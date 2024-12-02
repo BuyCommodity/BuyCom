@@ -105,7 +105,7 @@ def fetch_and_save_gst_record(request):
         start_month += 12
         start_year = current_year - 1
     else:
-        start_year = current_year
+        start_year = current_year - 1
         
     # Get the last two digits of the year
     start_year_short = str(start_year)[2:]
